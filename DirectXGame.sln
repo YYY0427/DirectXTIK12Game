@@ -5,6 +5,8 @@ VisualStudioVersion = 17.1.32228.430
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Game", "Game\Game.vcxproj", "{812690EC-500A-460D-9006-C6F67EA32216}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "DirectXTK12", "DirectXTK12\DirectXTK12.vcxproj", "{CBAF167A-324D-469F-89AB-6A3FCA1F149A}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -21,6 +23,14 @@ Global
 		{812690EC-500A-460D-9006-C6F67EA32216}.Release|x64.Build.0 = Release|x64
 		{812690EC-500A-460D-9006-C6F67EA32216}.Release|x86.ActiveCfg = Release|Win32
 		{812690EC-500A-460D-9006-C6F67EA32216}.Release|x86.Build.0 = Release|Win32
+		{CBAF167A-324D-469F-89AB-6A3FCA1F149A}.Debug|x64.ActiveCfg = Debug|x64
+		{CBAF167A-324D-469F-89AB-6A3FCA1F149A}.Debug|x64.Build.0 = Debug|x64
+		{CBAF167A-324D-469F-89AB-6A3FCA1F149A}.Debug|x86.ActiveCfg = Debug|Win32
+		{CBAF167A-324D-469F-89AB-6A3FCA1F149A}.Debug|x86.Build.0 = Debug|Win32
+		{CBAF167A-324D-469F-89AB-6A3FCA1F149A}.Release|x64.ActiveCfg = Release|x64
+		{CBAF167A-324D-469F-89AB-6A3FCA1F149A}.Release|x64.Build.0 = Release|x64
+		{CBAF167A-324D-469F-89AB-6A3FCA1F149A}.Release|x86.ActiveCfg = Release|Win32
+		{CBAF167A-324D-469F-89AB-6A3FCA1F149A}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
