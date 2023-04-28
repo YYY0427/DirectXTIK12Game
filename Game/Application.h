@@ -18,6 +18,8 @@ public:
 	void Run();
 	HINSTANCE GetInstanceHandle();
 	HWND GetWindowHandle();
+	int GetWindowWidth() const;
+	int GetWindowHeight() const;
 
 	~Application();
 

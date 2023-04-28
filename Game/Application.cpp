@@ -63,6 +63,16 @@ HWND Application::GetWindowHandle()
 	return wHandle_;
 }
 
+int Application::GetWindowWidth() const
+{
+	return window_width;
+}
+
+int Application::GetWindowHeight() const
+{
+	return window_height;
+}
+
 Application::~Application()
 {
 	UnregisterClass(class_name, instance_);
@@ -93,7 +103,7 @@ Application::Application()
 		L"GameWindow Okome",		// タイトルバーの文字列
 		WS_OVERLAPPEDWINDOW,		// 普通に重ねられるウィンドウのこと
 		CW_USEDEFAULT,				// X座標をデフォルトにする
-		CW_USEDEFAULT,				// X座標をデフォルトにする
+		CW_USEDEFAULT,				// Y座標をデフォルトにする
 		wrc.right - wrc.left,		// ウィンドウ幅
 		wrc.bottom - wrc.top,		// ウィンドウ高さ
 		nullptr,					// 親ウィンドウハンドル(親がないのでnullptr)
@@ -104,5 +114,5 @@ Application::Application()
 	assert(wHandle_ != NULL);
 
 	dx12_ = std::make_shared<DirectX12Wrapper>();
-	dx12_->Init();
+	dx12_->Init(this);
 }
