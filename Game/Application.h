@@ -1,6 +1,12 @@
 #pragma once
 #include <Windows.h>
+#include <memory>
 
+class DirectX12Wrapper;
+
+/// <summary>
+/// アプリ全体で使うアプリシングルトンクラス
+/// </summary>
 class Application
 {
 public:
@@ -10,6 +16,8 @@ public:
 	/// DirectXアプリケーションを開始する
 	/// </summary>
 	void Run();
+	HINSTANCE GetInstanceHandle();
+	HWND GetWindowHandle();
 
 	~Application();
 
@@ -20,6 +28,7 @@ private:
 	void operator = (const Application&) = delete;
 
 private:
-	HINSTANCE instance_;
-	HWND wHandle_;
+	std::shared_ptr<DirectX12Wrapper> dx12_;
+	HINSTANCE instance_;	// アプリケーションインスタンス
+	HWND wHandle_;			// ウィンドウハンドル
 };

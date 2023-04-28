@@ -1,4 +1,5 @@
 #include "Application.h"
+#include "DirectX12Wrapper.h"
 #include <DirectXHelpers.h>
 #include <Windows.h>
 #include <cassert>
@@ -52,6 +53,16 @@ void Application::Run()
 	}
 }
 
+HINSTANCE Application::GetInstanceHandle()
+{
+	return instance_;
+}
+
+HWND Application::GetWindowHandle()
+{
+	return wHandle_;
+}
+
 Application::~Application()
 {
 	UnregisterClass(class_name, instance_);
@@ -59,12 +70,14 @@ Application::~Application()
 
 Application::Application()
 {
+	// アプリケーションハンドルはGetModuleHandle(0)でも取得できる
 	instance_ = GetModuleHandle(0);
+
 	WNDCLASSEX wc = {};
 	wc.hInstance = instance_;
 	wc.cbSize = sizeof(WNDCLASSEX);
 	wc.lpfnWndProc = (WNDPROC)WindowProc;
-	wc.lpszClassName = class_name;		// OSが識別するための名前
+	wc.lpszClassName = class_name;			// OSが識別するための名前
 
 	// WindowsOSに対して「このウィンドウクラスを使うから、準備しといてね」
 	// ウィンドクラスをOSに登録する
@@ -89,4 +102,7 @@ Application::Application()
 		nullptr						// 追加のアプリケーションデータ(使わないのでnullptr)			
 	);
 	assert(wHandle_ != NULL);
+
+	dx12_ = std::make_shared<DirectX12Wrapper>();
+	dx12_->Init();
 }
