@@ -2,6 +2,7 @@
 #include <d3d12.h>
 #include <d3dx12.h>
 #include <dxgi1_6.h>
+#include <array>
 
 class Application;
 
@@ -24,5 +25,9 @@ private:
 	ComPtr<ID3D12CommandAllocator> cmdAlloc_;	// コマンドアロケータ
 	ComPtr<ID3D12DescriptorHeap> rtvHeaps_;		// レンダーターゲットビュー用デスクリプタヒープ
 	ComPtr<ID3D12Fence> fence_;					// 「待ち」を実装するためのもの
+	std::array<ID3D12Resource*, 2> rtvResources_;
+	ComPtr<ID3D12Resource> vertexBuffer_;		// 頂点バッファ
+	D3D12_VERTEX_BUFFER_VIEW vbView_ = {};
+
 	UINT64 fenceValue_ = 0;
 };

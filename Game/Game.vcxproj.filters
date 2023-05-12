@@ -33,4 +33,7 @@
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
   </ItemGroup>
+  <ItemGroup>
+    <FxCompile Include="..\DirectXTK12\VertexShader.hlsl" />
+  </ItemGroup>
 </Project>

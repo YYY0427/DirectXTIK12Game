@@ -2,9 +2,12 @@
 #include "Application.h"
 #include <cassert>
 #include <array>
+#include <DirectXMath.h>
 
 #pragma comment(lib, "d3d12.lib")
 #pragma comment(lib, "dxgi.lib")
+
+using namespace DirectX;
 
 DirectX12Wrapper::DirectX12Wrapper()
 {
@@ -153,14 +156,14 @@ bool DirectX12Wrapper::Init(Application* app)
 	swapChain_->GetDesc1(&scDesc);
 
 	// スワップチェーンが持ってるバッファ取得用
-	std::array<ID3D12Resource*, 2> renderTargetResources;
+//	std::array<ID3D12Resource*, 2> renderTargetResources;
 	
 	// スワップチェーン内のバッファ数分ループする
 	for (int i = 0; i < scDesc.BufferCount; ++i)
 	{
 		// スワップチェーンの特定番号のバッファを取得する
-		result = swapChain_->GetBuffer(i, IID_PPV_ARGS(&renderTargetResources[i]));
-		dev_->CreateRenderTargetView(renderTargetResources[i], nullptr, descHandle);
+		result = swapChain_->GetBuffer(i, IID_PPV_ARGS(&rtvResources_[i]));
+		dev_->CreateRenderTargetView(rtvResources_[i], nullptr, descHandle);
 		descHandle.ptr += dev_->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 	}
 
@@ -182,11 +185,43 @@ bool DirectX12Wrapper::Init(Application* app)
 
 	result = dev_->CreateFence(fenceValue_, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(fence_.ReleaseAndGetAddressOf()));
 
+	std::array<XMFLOAT3, 3> vertices = {	
+		XMFLOAT3(- 1.0f, -1.0f, 0.5f),	// 左下
+		XMFLOAT3(0.1f,  1.0f, 0.5f),	// 真ん中上
+		XMFLOAT3(1.0f, -1.0f, 0.5f),	// 右下
+	};
+
+	auto vertResDesc = CD3DX12_RESOURCE_DESC::Buffer(sizeof(XMFLOAT3) * vertices.size());
+	auto vertHeapProps = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
+
+	result = dev_->CreateCommittedResource(
+		&vertHeapProps, 
+		D3D12_HEAP_FLAG_NONE, 
+		&vertResDesc, 
+		D3D12_RESOURCE_STATE_GENERIC_READ, 
+		nullptr, 
+		IID_PPV_ARGS(vertexBuffer_.ReleaseAndGetAddressOf()));
+	assert(SUCCEEDED(result));
+
+	XMFLOAT3* vertMap = nullptr;
+	result = vertexBuffer_->Map(0, nullptr, (void**)&vertMap);
+	assert(SUCCEEDED(result));
+
+	// 頂点データをGPU上のバッファにコピーする
+	std::copy(vertices.begin(), vertices.end(), vertMap);
+	vertexBuffer_->Unmap(0, nullptr);
+
+	vbView_.BufferLocation = vertexBuffer_->GetGPUVirtualAddress();
+	vbView_.SizeInBytes = sizeof(XMFLOAT3) * vertices.size();
+	vbView_.StrideInBytes = sizeof(XMFLOAT3);
+
 	return true;
 }
 
 bool DirectX12Wrapper::Update()
 {
+	static float red = 0.0f;
+
 	cmdAlloc_->Reset();
 	cmdList_->Reset(cmdAlloc_.Get(), nullptr);
 
@@ -195,11 +230,28 @@ bool DirectX12Wrapper::Update()
 	auto bbIdx = swapChain_->GetCurrentBackBufferIndex();
 	heapStart.ptr += bbIdx * dev_->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 
+	auto beforBarrier = CD3DX12_RESOURCE_BARRIER::Transition(rtvResources_[bbIdx],	// 対象のリソース(データの塊)
+		D3D12_RESOURCE_STATE_PRESENT,				// 前の使い方
+		D3D12_RESOURCE_STATE_RENDER_TARGET			// 後の使い方
+	);
+	cmdList_->ResourceBarrier(1, &beforBarrier);
+
 	cmdList_->OMSetRenderTargets(1, &heapStart, false, nullptr);
 
+	red = fmodf(red + 0.0001f, 1.0f);
 	// その時のレンダーターゲットのクリア
-	std::array<float, 4> clearColor = { 1.0f, 0.0f, 0.0f, 1.0f };
+	std::array<float, 4> clearColor = { red, 1.0f, 0.0f, 1.0f };
 	cmdList_->ClearRenderTargetView(heapStart, clearColor.data(), 0, nullptr);
+
+	// 頂点バッファをセットする
+	cmdList_->IASetVertexBuffers(0, 1, &vbView_);
+
+	auto afterBarrier = CD3DX12_RESOURCE_BARRIER::Transition(rtvResources_[bbIdx],	// 対象のリソース(データの塊)
+		D3D12_RESOURCE_STATE_RENDER_TARGET,			// 前の使い方	
+		D3D12_RESOURCE_STATE_PRESENT				// 後の使い方
+	);
+	cmdList_->ResourceBarrier(1, &afterBarrier);
+
 	cmdList_->Close();
 
 	ID3D12CommandList* cmdlists[] = { cmdList_.Get() };
