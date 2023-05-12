@@ -57,6 +57,7 @@ bool DirectX12Wrapper::Init(Application* app)
 		DXGI_ADAPTER_DESC adesc = {};
 		adpt->GetDesc(&adesc);
 		std::wstring strDesc = adesc.Description;
+
 		// PCのGPUがAMDの場合、選ばれない可能性がある
 		if (strDesc.find(L"NVIDIA") != std::string::npos)
 		{
@@ -143,20 +144,67 @@ bool DirectX12Wrapper::Init(Application* app)
 	rtvHeapDesc.NumDescriptors = 2;
 	rtvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;	// レンダーターゲットビューとして
 	rtvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
-	dev_->CreateDescriptorHeap(&rtvHeapDesc, IID_PPV_ARGS(rtvHeaps_.ReleaseAndGetAddressOf()));
+	result = dev_->CreateDescriptorHeap(&rtvHeapDesc, IID_PPV_ARGS(rtvHeaps_.ReleaseAndGetAddressOf()));
 
-	CD3DX12_CPU_DESCRIPTOR_HANDLE descHandle(rtvHeaps_->GetCPUDescriptorHandleForHeapStart(), 0, 0);
+	D3D12_CPU_DESCRIPTOR_HANDLE descHandle = { rtvHeaps_->GetCPUDescriptorHandleForHeapStart() };
+
+	// すでに表画面と裏画面はSwapChain内にあるので、それを取得できるようにswapChainの情報を取得しておく
+	DXGI_SWAP_CHAIN_DESC1 scDescForRTV = {};
 	swapChain_->GetDesc1(&scDesc);
+
+	// スワップチェーンが持ってるバッファ取得用
 	std::array<ID3D12Resource*, 2> renderTargetResources;
+	
+	// スワップチェーン内のバッファ数分ループする
 	for (int i = 0; i < scDesc.BufferCount; ++i)
 	{
+		// スワップチェーンの特定番号のバッファを取得する
 		result = swapChain_->GetBuffer(i, IID_PPV_ARGS(&renderTargetResources[i]));
 		dev_->CreateRenderTargetView(renderTargetResources[i], nullptr, descHandle);
 		descHandle.ptr += dev_->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 	}
 
-
 	assert(SUCCEEDED(result));
 
+	result = dev_->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, 
+		IID_PPV_ARGS(cmdAlloc_.ReleaseAndGetAddressOf()));
+	assert(SUCCEEDED(result));
+
+	result = dev_->CreateCommandList(0, 
+		D3D12_COMMAND_LIST_TYPE_DIRECT, 
+		cmdAlloc_.Get(),
+		nullptr, 
+		IID_PPV_ARGS(cmdList_.ReleaseAndGetAddressOf()));
+	assert(SUCCEEDED(result));
+
+	cmdAlloc_->Reset();
+	cmdList_->Reset(cmdAlloc_.Get(), nullptr);
+
+	result = dev_->CreateFence(fenceValue_, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(fence_.ReleaseAndGetAddressOf()));
+
 	return true;
+}
+
+bool DirectX12Wrapper::Update()
+{
+	cmdAlloc_->Reset();
+	cmdList_->Reset(cmdAlloc_.Get(), nullptr);
+
+	// レンダーターゲットの指定
+	auto heapStart = rtvHeaps_->GetCPUDescriptorHandleForHeapStart();
+	auto bbIdx = swapChain_->GetCurrentBackBufferIndex();
+	heapStart.ptr += bbIdx * dev_->GetDescriptorHandleIncrementSize(D3D12_DIS);
+
+	// その時のレンダーターゲットのクリア
+	cmdList_->OMSetRenderTargets(1, &heapStart, false, nullptr);
+	std::array<float, 4> clearColor = { 0.5f, 1.0f, 1.0f, 1.0f };
+	cmdList_->ClearRenderTargetView(heapStart, clearColor.data(), 0, nullptr);
+
+	cmdList_->Close();
+
+	ID3D12CommandList* cmdlists[] = { cmdList_.Get() };
+	cmdQue_->ExecuteCommandLists(1, cmdlists);
+	swapChain_->Present(0, 0);
+
+	return false;
 }
