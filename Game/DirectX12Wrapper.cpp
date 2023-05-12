@@ -193,17 +193,27 @@ bool DirectX12Wrapper::Update()
 	// レンダーターゲットの指定
 	auto heapStart = rtvHeaps_->GetCPUDescriptorHandleForHeapStart();
 	auto bbIdx = swapChain_->GetCurrentBackBufferIndex();
-	heapStart.ptr += bbIdx * dev_->GetDescriptorHandleIncrementSize(D3D12_DIS);
+	heapStart.ptr += bbIdx * dev_->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+
+	cmdList_->OMSetRenderTargets(1, &heapStart, false, nullptr);
 
 	// その時のレンダーターゲットのクリア
-	cmdList_->OMSetRenderTargets(1, &heapStart, false, nullptr);
-	std::array<float, 4> clearColor = { 0.5f, 1.0f, 1.0f, 1.0f };
+	std::array<float, 4> clearColor = { 1.0f, 0.0f, 0.0f, 1.0f };
 	cmdList_->ClearRenderTargetView(heapStart, clearColor.data(), 0, nullptr);
-
 	cmdList_->Close();
 
 	ID3D12CommandList* cmdlists[] = { cmdList_.Get() };
 	cmdQue_->ExecuteCommandLists(1, cmdlists);
+
+	// GPUの処理が終わったとき、fence_の中の値が、fenceValue_に変化する
+	// 例)初回なら、最初fence_は0で初期化されているので0。ここで、
+	// ++fenceValueを渡しているため、GPU上の処理が終わったらfence_の中の値は1になる
+	cmdQue_->Signal(fence_.Get(), ++fenceValue_);
+	while (fence_->GetCompletedValue() != fenceValue_)
+	{
+		;// 何もしない
+	}
+
 	swapChain_->Present(0, 0);
 
 	return false;
