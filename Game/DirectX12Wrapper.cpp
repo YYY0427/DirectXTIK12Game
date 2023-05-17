@@ -185,6 +185,7 @@ bool DirectX12Wrapper::Init(Application* app)
 
 	result = dev_->CreateFence(fenceValue_, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(fence_.ReleaseAndGetAddressOf()));
 
+	// 頂点データ(CPUから見えるデータ)
 	std::array<XMFLOAT3, 3> vertices = {	
 		XMFLOAT3(- 1.0f, -1.0f, 0.5f),	// 左下
 		XMFLOAT3(0.1f,  1.0f, 0.5f),	// 真ん中上
