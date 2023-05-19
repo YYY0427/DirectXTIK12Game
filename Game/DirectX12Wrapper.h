@@ -28,6 +28,8 @@ private:
 	std::array<ID3D12Resource*, 2> rtvResources_;
 	ComPtr<ID3D12Resource> vertexBuffer_;		// 頂点バッファ
 	D3D12_VERTEX_BUFFER_VIEW vbView_ = {};
+	ComPtr<ID3D12RootSignature> rootSig_;
+	ComPtr<ID3D12PipelineState> piplineState_;
 
 	UINT64 fenceValue_ = 0;
 };

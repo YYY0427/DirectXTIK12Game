@@ -3,9 +3,11 @@
 #include <cassert>
 #include <array>
 #include <DirectXMath.h>
+#include <d3dcompiler.h>
 
 #pragma comment(lib, "d3d12.lib")
 #pragma comment(lib, "dxgi.lib")
+#pragma comment(lib, "d3dcompiler.lib")
 
 using namespace DirectX;
 
@@ -192,15 +194,18 @@ bool DirectX12Wrapper::Init(Application* app)
 		XMFLOAT3(1.0f, -1.0f, 0.5f),	// 右下
 	};
 
+	// GPUが利用できる「頂点バッファ」を作る
 	auto vertResDesc = CD3DX12_RESOURCE_DESC::Buffer(sizeof(XMFLOAT3) * vertices.size());
 	auto vertHeapProps = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
 
+	// バッファを確保する関数がCreateCommittedResource
+	// 確保するが、確保の仕方を最適化しようとするため、細かい指定が必要
 	result = dev_->CreateCommittedResource(
-		&vertHeapProps, 
-		D3D12_HEAP_FLAG_NONE, 
-		&vertResDesc, 
-		D3D12_RESOURCE_STATE_GENERIC_READ, 
-		nullptr, 
+		&vertHeapProps,						// 確保されるメモリの特質
+		D3D12_HEAP_FLAG_NONE,				// 特殊なフラグ
+		&vertResDesc,						// 配置位置
+		D3D12_RESOURCE_STATE_GENERIC_READ,	// 
+		nullptr,							//	
 		IID_PPV_ARGS(vertexBuffer_.ReleaseAndGetAddressOf()));
 	assert(SUCCEEDED(result));
 
@@ -216,6 +221,62 @@ bool DirectX12Wrapper::Init(Application* app)
 	vbView_.SizeInBytes = sizeof(XMFLOAT3) * vertices.size();
 	vbView_.StrideInBytes = sizeof(XMFLOAT3);
 
+	ComPtr<ID3DBlob> vsBlob = nullptr;	// 頂点シェーダー
+	ComPtr<ID3DBlob> psBlob = nullptr;	// ピクセルシェーダー
+
+	// シェーダーのロード
+	result = D3DCompileFromFile(L"VertexShader.hlsl", nullptr, nullptr, "main", "vs_5_0", D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION, 0, vsBlob.ReleaseAndGetAddressOf(), nullptr);
+	assert(SUCCEEDED(result));
+	result = D3DCompileFromFile(L"PixelShader.hlsl", nullptr, nullptr, "main", "ps_5_0", D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION, 0, psBlob.ReleaseAndGetAddressOf(), nullptr);
+	assert(SUCCEEDED(result));
+
+	// 入力レイアウト
+	D3D12_INPUT_ELEMENT_DESC layoutDesc[] =
+	{
+		{"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0}
+	};
+
+	// パイプラインオブジェクトを作る
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC ppDesc = {};
+	ppDesc.InputLayout.NumElements = _countof(layoutDesc);
+	ppDesc.InputLayout.pInputElementDescs = layoutDesc;
+
+	// 頂点入力
+	ppDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+	ppDesc.VS.pShaderBytecode = vsBlob->GetBufferPointer();
+	ppDesc.VS.BytecodeLength = vsBlob->GetBufferSize();
+
+	// ラスタライザ
+	ppDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
+
+	// ピクセルシェーダー
+	ppDesc.PS.pShaderBytecode = psBlob->GetBufferPointer();
+	ppDesc.PS.BytecodeLength = psBlob->GetBufferSize();
+
+	// 出力マネージャー
+	ppDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
+	ppDesc.NodeMask = 0;
+	ppDesc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
+
+	D3D12_ROOT_PARAMETER rootParam = {};
+	rootParam.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+	rootParam.DescriptorTable.NumDescriptorRanges = 1;
+	ComPtr<ID3D10Blob> rootBlob;
+
+	D3D12_ROOT_SIGNATURE_DESC rsDesc = {};
+	// 頂点入力(頂点レイアウト)がある場合これを使う
+	rsDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
+	rsDesc.NumParameters = 0;
+	result = D3D12SerializeRootSignature(&rsDesc, D3D_ROOT_SIGNATURE_VERSION_1, rootBlob.ReleaseAndGetAddressOf(), nullptr);
+	assert(SUCCEEDED(result));
+	result = dev_->CreateRootSignature(0, rootBlob->GetBufferPointer(), rootBlob->GetBufferSize(), IID_PPV_ARGS(rootSig_.ReleaseAndGetAddressOf()));
+	assert(SUCCEEDED(result));
+
+	ppDesc.pRootSignature = rootSig_.Get();
+
+	result = dev_->CreateGraphicsPipelineState(&ppDesc, IID_PPV_ARGS(piplineState_.ReleaseAndGetAddressOf()));
+	assert(SUCCEEDED(result));
+
 	return true;
 }
 
@@ -224,7 +285,7 @@ bool DirectX12Wrapper::Update()
 	static float red = 0.0f;
 
 	cmdAlloc_->Reset();
-	cmdList_->Reset(cmdAlloc_.Get(), nullptr);
+	cmdList_->Reset(cmdAlloc_.Get(), piplineState_.Get());
 
 	// レンダーターゲットの指定
 	auto heapStart = rtvHeaps_->GetCPUDescriptorHandleForHeapStart();
@@ -244,8 +305,26 @@ bool DirectX12Wrapper::Update()
 	std::array<float, 4> clearColor = { red, 1.0f, 0.0f, 1.0f };
 	cmdList_->ClearRenderTargetView(heapStart, clearColor.data(), 0, nullptr);
 
+	// ルートシグネチチャとパイプラインステートをセット
+	cmdList_->SetGraphicsRootSignature(rootSig_.Get());
+	cmdList_->SetPipelineState(piplineState_.Get());
+
 	// 頂点バッファをセットする
 	cmdList_->IASetVertexBuffers(0, 1, &vbView_);
+	cmdList_->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+	// どこに描画するのかを指定
+	auto viewPort = CD3DX12_VIEWPORT(0.0f, 0.0f, 640.0f, 480.0f);
+	cmdList_->RSSetViewports(1, &viewPort);
+
+	D3D12_RECT rect = {};
+	rect.left = 0;
+	rect.top = 0;
+	rect.right = 640;
+	rect.bottom = 480;
+	cmdList_->RSSetScissorRects(1, &rect);
+
+	cmdList_->DrawInstanced(3, 1, 0, 0);
 
 	auto afterBarrier = CD3DX12_RESOURCE_BARRIER::Transition(rtvResources_[bbIdx],	// 対象のリソース(データの塊)
 		D3D12_RESOURCE_STATE_RENDER_TARGET,			// 前の使い方	

@@ -35,5 +35,6 @@
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="..\DirectXTK12\VertexShader.hlsl" />
+    <FxCompile Include="PixelShader.hlsl" />
   </ItemGroup>
 </Project>
