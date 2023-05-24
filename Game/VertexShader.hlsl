@@ -1,13 +1,15 @@
 // 頂点シェーダ
 struct Data
 {
-	float4 svpos : SV_POSITION;
-	float4 col : COLOR;
+	float4 svpos : SV_POSITION;	// システムに渡す座標
+	float4 col : COLOR;			// 頂点カラー
+	float2 uv : TEXCOORD;		// UV座標
 };
 
-Data main(float4 pos : POSITION, float4 col : COLOR)
+Data main(float4 pos : POSITION, float4 col : COLOR, float2 uv : TEXCOORD)
 {
 	Data data;
+	data.uv = uv;
 
 	// 2Dピクセル座標から3D座標に変換
 	// 0～640 → -1～1
