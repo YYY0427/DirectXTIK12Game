@@ -12,12 +12,15 @@ class Application
 public:
 	static Application& GetInstance();
 
+	// アプリケーション初期化
+	void Init();
+
 	/// <summary>
 	/// DirectXアプリケーションを開始する
 	/// </summary>
 	void Run();
 	HINSTANCE GetInstanceHandle();
-	HWND GetWindowHandle();
+	HWND GetWindowHandle() const;
 	int GetWindowWidth() const;
 	int GetWindowHeight() const;
 

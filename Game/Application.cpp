@@ -35,6 +35,11 @@ Application& Application::GetInstance()
 	return instance;
 }
 
+void Application::Init()
+{
+	dx12_->Init(this);
+}
+
 void Application::Run()
 {
 	ShowWindow(wHandle_, SW_SHOW);
@@ -59,7 +64,7 @@ HINSTANCE Application::GetInstanceHandle()
 	return instance_;
 }
 
-HWND Application::GetWindowHandle()
+HWND Application::GetWindowHandle() const
 {
 	return wHandle_;
 }
@@ -115,5 +120,5 @@ Application::Application()
 	assert(wHandle_ != NULL);
 
 	dx12_ = std::make_shared<DirectX12Wrapper>();
-	dx12_->Init(this);
+//	dx12_->Init(this);
 }
